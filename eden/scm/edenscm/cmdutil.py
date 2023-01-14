@@ -18,6 +18,7 @@ import os
 import re
 import stat
 import tempfile
+from enum import Enum
 from typing import Dict
 
 import bindings
@@ -3188,6 +3189,7 @@ def displaygraph(
         for rev in reserved:
             renderer.reserve(rev)
 
+    show_abbreviated_ancestors = ShowAbbreviatedAncestorsWhen.from_setting(repo.ui.config("experimental", "graph.show-abbreviated-ancestors"))
     for (rev, _type, ctx, parents) in dag:
         char = formatnode(repo, ctx)
         copies = None
@@ -3200,6 +3202,11 @@ def displaygraph(
         revmatchfn = None
         if filematcher is not None:
             revmatchfn = filematcher(ctx.rev())
+        if show_abbreviated_ancestors is ShowAbbreviatedAncestorsWhen.ONLYMERGE:
+            if len(parents) == 1 and parents[0][0] == graphmod.MISSINGPARENT:
+                parents = []
+        elif show_abbreviated_ancestors is ShowAbbreviatedAncestorsWhen.NEVER:
+            parents = [p for p in parents if p[0] != graphmod.MISSINGPARENT]
         width = renderer.width(rev, parents)
         displayer.show(
             ctx, copies=copies, matchfn=revmatchfn, _graphwidth=width, **props
@@ -3217,6 +3224,21 @@ def displaygraph(
         displayer.flush(ctx)
 
     displayer.close()
+
+
+class ShowAbbreviatedAncestorsWhen(Enum):
+    ALWAYS = "always"
+    ONLYMERGE = "onlymerge"
+    NEVER = "never"
+
+    @staticmethod
+    def from_setting(setting) -> "ShowAbbreviatedAncestorsWhen":
+        if setting is None:
+            return ShowAbbreviatedAncestorsWhen.ALWAYS
+        try:
+            return ShowAbbreviatedAncestorsWhen(setting)
+        except ValueError:
+            return ShowAbbreviatedAncestorsWhen.ALWAYS if util.parsebool(setting) else ShowAbbreviatedAncestorsWhen.NEVER
 
 
 def graphlog(ui, repo, pats, opts):
