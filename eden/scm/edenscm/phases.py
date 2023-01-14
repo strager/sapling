@@ -210,6 +210,7 @@ class phasecache(object):
             self._draftrevs = None
             self._publicrevs = None
             if _load:
+                # @@@ this logic looks fishy
                 if self._headbased:
                     self.draftrevs(repo)
                     self.publicrevs(repo)
